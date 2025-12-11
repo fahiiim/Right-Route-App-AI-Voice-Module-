@@ -21,6 +21,13 @@ The AI Voice Module for the Right Route App solves a critical logistics challeng
 
 The final output is a clean JSON object, ready for integration with mapping APIs to plot the definitive route.
 
+Here is the UX Design of some of the pages:
+
+<img width="313" height="676" alt="image" src="https://github.com/user-attachments/assets/892f81a1-48c8-4b84-82ba-17b2b8e730ca" /> <img width="311" height="675" alt="image" src="https://github.com/user-attachments/assets/96c60e5f-bc24-43f6-8724-2649a39d5144" /> <img width="312" height="679" alt="image" src="https://github.com/user-attachments/assets/f16d36b7-2115-4495-a3c5-f2812e747bdb" />
+
+
+
+
 ## Core Features
 
 | Feature                  | Description                                                                                                                              |
