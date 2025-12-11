@@ -1,338 +1,196 @@
-# Right Route App - AI Voice Module
+<!-- markdownlint-disable-next-line MD041 -->
+<div align="center">
+  <h1 align="center">Right Route App - AI Voice Module</h1>
 
-A professional speech-to-text module for capturing and parsing USA-based route instructions using **Google Cloud Speech-to-Text API** and **OpenAI GPT models**.
+  <p align="center">
+    A professional-grade, AI-powered voice module for parsing US trucking routes from spoken instructions into structured, map-ready data.
+  </p>
 
-## Features
+  <p align="center">
+    <!-- Badges -->
+    <a href="https://www.python.org/downloads/release/python-380/"><img src="https://img.shields.io/badge/Python-3.8+-blue.svg?style=for-the-badge&logo=python" alt="Python 3.8+"></a>
+    <a href="https://cloud.google.com/speech-to-text"><img src="https://img.shields.io/badge/Google_Cloud-Speech--to--Text-4285F4.svg?style=for-the-badge&logo=google-cloud" alt="Google Cloud STT"></a>
+    <a href="https://openai.com/api/"><img src="https://img.shields.io/badge/OpenAI-GPT--4o-412991.svg?style=for-the-badge&logo=openai" alt="OpenAI GPT-4o"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-red.svg?style=for-the-badge" alt="License: Proprietary"></a>
+  </p>
+</div>
 
-✅ **Real-time Audio Recording**
-- Intelligent microphone input with voice activity detection
-- Auto-stops after 10 seconds of silence
-- Clear speech detection (RMS threshold filtering)
-- Maximum 3-minute recording duration
+---
 
-✅ **Advanced Speech Processing**
-- Aggressive noise reduction (95% prop_decrease)
-- High-pass filter (300 Hz) - removes rumble and AC hum
-- Low-pass filter (7 kHz) - removes hiss artifacts
-- Frequency optimization for human speech (300-7000 Hz)
+The AI Voice Module for the Right Route App solves a critical logistics challenge: converting complex, spoken route permits from truck drivers into precise, structured data for mapping. The system listens to a driver's full route description, intelligently captures the start and end points, identifies all intermediate highways, and corrects common speech-to-text errors in real-time.
 
-✅ **Accurate Transcription**
-- Google Cloud Speech-to-Text with enhanced model
-- Support for long-form audio (180 seconds)
-- Route-specific speech context hints
-- Fallback streaming recognition
+The final output is a clean JSON object, ready for integration with mapping APIs to plot the definitive route.
 
-✅ **Intelligent Route Parsing**
-- OpenAI GPT-4o for STT error correction
-- Automatic fixing of common speech recognition errors:
-  - "IA 9" → "IA-9"
-  - "san boom" → "SANBORN"
-  - "coil av" → "QUAIL AVE"
-  - Split words joining and formatting
-- USA-specific highway and state recognition
-- Proper punctuation and formatting
+## Core Features
 
-✅ **Structured Output**
-```json
-{
-  "start_point": "START ON IA-9 EB AT A10 INTERSECTION (LYON) (STATE BORDER OF SOUTH DAKOTA)",
-  "end_point": "END ON B62 WB AT QUAIL AVE INTERSECTION (HANCOCK) (IOWA)",
-  "route_segments": ["US-75 SB", "IA-9 EB", "US-59 SB", "US-18 EB", "IA-4 SB", "IA-3 EB", "US-69 NB", "B62 WB"],
-  "corrected_text": "Full corrected route instruction with proper formatting"
-}
+| Feature                  | Description                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **🎤 Voice-Activated Recording** | Uses voice activity detection (VAD) to record automatically. Filters background noise and auto-stops after a period of silence.        |
+| **🔊 Advanced Audio Processing** | A multi-stage pipeline aggressively reduces noise and applies high-pass/low-pass filters to isolate human speech frequencies.         |
+| **🗣️ High-Accuracy Transcription** | Leverages Google Cloud's enhanced `video` model, optimized for long-form, noisy audio and enriched with route-specific context hints. |
+| **🧠 Intelligent Route Parsing** | Employs OpenAI's GPT-4o to perform contextual error correction and intelligently parse the raw transcript into a structured route. |
+| **🗺️ Structured JSON Output** | Delivers clean, predictable JSON with `start_point`, `end_point`, and an ordered list of `route_segments`.                              |
+
+## System Architecture
+
+The module follows a sequential processing pipeline, transforming raw audio into structured route data. Each stage is optimized for accuracy and performance.
+
+```mermaid
+graph TD;
+    A[🎤 Raw Microphone Audio] -->|Capture| B(🔊 Audio Recording Module);
+    B -->|Detect Voice Activity & Silence| C(📈 Preprocessing Stage);
+    subgraph C [Audio Preprocessing]
+        direction LR
+        C1[Noise Reduction] --> C2[High-Pass Filter] --> C3[Low-Pass Filter];
+    end
+    C -->|Cleaned WAV Audio| D(☁️ Google Cloud Speech-to-Text);
+    D -->|Raw Transcript| E(🤖 OpenAI GPT-4o Parser);
+    subgraph E [Intelligent Parsing]
+        direction LR
+        E1[Contextual STT Correction] --> E2[Entity Extraction] --> E3[Format & Structure];
+    end
+    E -->|Structured Data| F(✅ JSON Route Output);
+
+    style A fill:#D6EAF8,stroke:#333,stroke-width:2px
+    style F fill:#D5F5E3,stroke:#333,stroke-width:2px
 ```
 
-## Installation
+## Getting Started
 
 ### Prerequisites
-- Python 3.8+
-- Microphone access
-- OpenAI API key
-- Google Cloud service account credentials
+*   Python 3.8 or higher
+*   Microphone access for your system
+*   **OpenAI API Key**: [Get your key](https://platform.openai.com/account/api-keys)
+*   **Google Cloud Service Account**: [Create a service account](https://console.cloud.google.com/iam-admin/serviceaccounts) and download the JSON key file.
 
-### Setup
+### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/fahiiim/Right-Route-App-AI-Voice-Module-.git
-   cd Right-Route-App-AI-Voice-Module-
-   ```
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/fahiiim/Right-Route-App-AI-Voice-Module-.git
+    cd Right-Route-App-AI-Voice-Module-
+    ```
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   # Windows
-   venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
-   ```
+2.  **Set Up a Virtual Environment**
+    ```bash
+    # Create the environment
+    python -m venv venv
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+    # Activate it
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
+    source venv/bin/activate
+    ```
 
-4. **Configure environment variables**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env with your credentials
-   nano .env  # or use your editor
-   ```
+3.  **Install Dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-5. **Add API Credentials**
+4.  **Configure Environment Variables**
+    Create a `.env` file from the template and add your credentials.
+    ```bash
+    # Copy the example file
+    cp .env.example .env
 
-   **OpenAI API Key:**
-   - Get from: https://platform.openai.com/account/api-keys
-   - Add to `.env`: `OPENAI_API_KEY=sk-...`
+    # Open the file in your preferred editor
+    nano .env
+    ```
+    Populate `.env` with your API keys:
+    ```ini
+    # .env
+    OPENAI_API_KEY="sk-..."
+    GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/google-credentials.json"
+    ```
 
-   **Google Cloud Credentials:**
-   - Create service account: https://console.cloud.google.com/iam-admin/serviceaccounts
-   - Download JSON key file
-   - Option A: Set path in `.env`: `GOOGLE_CLOUD_CREDENTIALS=/path/to/key.json`
-   - Option B: Set JSON content in `.env`: `GOOGLE_CLOUD_CREDENTIALS={"type":"service_account",...}`
+## How to Use
 
-## Usage
+Execute the main module from the command line. The system will prompt you to begin speaking.
 
-### Basic Usage
 ```bash
 python stt_module.py
 ```
 
-### Output
-```
-[RECORDING] Max 180s, auto-stop after 10s silence
-
-Speak clearly... Background noise will be ignored.
-
-[SILENCE DETECTED] Recording stopped
-
-[RECORDING] Complete
-
-[PROCESSING] Google Cloud STT...
-
-[INFO] Used standard recognition (better for complex content)
-
-[ROUTE EXTRACTION] Correcting STT errors and parsing with OpenAI...
-
-[ROUTE EXTRACTION] Complete
-
-[INFO] Corrected transcription:
-Authorized Route: START ON IA-9 EB AT A10 INTERSECTION (LYON)(STATE BORDER OF SOUTH DAKOTA)...
-
-============================================================
-ROUTE INFORMATION (USA)
-============================================================
-
-START POINT: START ON IA-9 EB AT A10 INTERSECTION (LYON) (STATE BORDER OF SOUTH DAKOTA)
-END POINT: END ON B62 WB AT QUAIL AVE INTERSECTION (HANCOCK) (IOWA)
-
-ROUTE SEGMENTS (Sequential):
-  1. US-75 SB
-  2. IA-9 EB
-  3. US-59 SB
-  4. US-18 EB
-  5. IA-4 SB
-  6. IA-3 EB
-  7. US-69 NB
-  8. B62 WB
-
-============================================================
-```
-
-## Architecture
-
-### Module Structure
+### Example Session
 
 ```
-Right-Route-App-AI-Voice-Module/
-├── stt_module.py          # Main STT recording and transcription module
-├── config.py              # Google Cloud configuration
-├── route_parser.py        # OpenAI route extraction and parsing
-├── requirements.txt       # Python dependencies
-├── .env.example          # Environment variable template
-├── .gitignore            # Git ignore rules
-└── README.md             # This file
+[INFO] Awaiting user input...
+[RECORDING] Listening... (Max 180s, auto-stops after 10s silence)
+> User speaks the route instructions...
+[SILENCE DETECTED] Recording stopped.
+[INFO] Recording complete. Total duration: 25.4s
+
+[PROCESSING] Applying audio filters...
+[PROCESSING] Transcribing with Google Cloud STT...
+[PROCESSING] Correcting and parsing route with OpenAI...
+[INFO] Route extraction complete.
+
+======================================================================
+                        USA ROUTE INFORMATION
+======================================================================
+
+  ▶ START: START ON IA-9 EB AT A10 INTERSECTION (LYON) (STATE BORDER OF SOUTH DAKOTA)
+  ▶ END:   END ON B62 WB AT QUAIL AVE INTERSECTION (HANCOCK) (IOWA)
+
+  ▶ ROUTE:
+      1. US-75 SB
+      2. IA-9 EB
+      3. US-59 SB
+      4. US-18 EB
+      5. IA-4 SB
+      6. IA-3 EB
+      7. US-69 NB
+      8. B62 WB
+
+======================================================================
 ```
+The final JSON is saved to `route_output.json`.
 
-### Processing Pipeline
+## Configuration Details
 
-```
-Microphone Audio
-     ↓
-[Audio Recording with Voice Detection]
-     ↓
-[Audio Preprocessing - Noise Reduction & Filtering]
-     ↓
-[Google Cloud STT Transcription]
-     ↓
-[OpenAI STT Error Correction & Route Parsing]
-     ↓
-[Structured Route JSON Output]
-```
+The system is pre-configured for optimal performance but can be adjusted in `config.py` and `stt_module.py`.
 
-## Configuration
+| Parameter           | Value                       | Purpose                                        |
+| ------------------- | --------------------------- | ---------------------------------------------- |
+| **Recording**       |                             |                                                |
+| `MAX_DURATION`      | 180s                        | Prevents excessively long recordings.          |
+| `SILENCE_THRESHOLD` | 10s                         | Stops recording after 10 seconds of no speech. |
+| `RMS_THRESHOLD`     | 500                         | Ignores low-volume background noise.           |
+| **Audio Processing**|                             |                                                |
+| `NOISE_REDUCTION`   | 95% `prop_decrease`         | Aggressively removes stationary background noise. |
+| `HIGH_PASS_FILTER`  | 300 Hz                      | Eliminates low-frequency rumble (e.g., engine hum). |
+| `LOW_PASS_FILTER`   | 7 kHz                       | Removes high-frequency hiss.                   |
+| **AI Models**       |                             |                                                |
+| `GOOGLE_STT_MODEL`  | `video` (enhanced)          | Best for long-form, potentially noisy audio.   |
+| `OPENAI_MODEL`      | `gpt-4o`                    | State-of-the-art for reasoning and correction. |
 
-### Recording Parameters
-- **Max Duration**: 180 seconds (3 minutes)
-- **Silence Threshold**: 10 seconds (auto-stop)
-- **Speech Threshold**: 500 RMS (high-quality speech detection)
-- **Sample Rate**: 16000 Hz
-- **Audio Format**: LINEAR16 (16-bit PCM)
+## 🔐 API Key Security
 
-### Audio Processing
-- **Noise Reduction**: Aggressive (95% prop_decrease)
-- **High-Pass Filter**: 300 Hz (removes rumble)
-- **Low-Pass Filter**: 7 kHz (removes hiss)
+> **Warning**
+> Never commit API keys or credential files to your Git repository.
 
-### STT Configuration
-- **Google Cloud Model**: video (optimized for long-form audio)
-- **Enhanced Model**: Enabled (better accuracy)
-- **Punctuation**: Automatic
-- **OpenAI Model**: GPT-4o (best accuracy for route parsing)
-
-## API Keys & Security
-
-⚠️ **IMPORTANT SECURITY NOTES:**
-
-1. **Never commit API keys** - Use `.env` files
-2. **Use `.gitignore`** - Prevents accidental key leaks
-3. **Rotate keys regularly** - If exposed, rotate immediately
-4. **Use environment variables** - All keys loaded from `.env`
-5. **Restrict API permissions** - Use minimal scopes needed
-
-### If Keys Are Exposed
-
-1. **Immediately revoke the keys:**
-   - OpenAI: https://platform.openai.com/account/api-keys
-   - Google Cloud: IAM console
-
-2. **Generate new keys**
-
-3. **Commit the .env file removal:**
-   ```bash
-   git rm --cached .env
-   git commit -m "Remove exposed credentials"
-   ```
+- **Environment Variables**: All keys are loaded securely from a `.env` file, which is listed in `.gitignore`.
+- **Restricted Permissions**: When creating your Google Cloud service account, grant it only the `Cloud Speech-to-Text API User` role to follow the principle of least privilege.
+- **Key Rotation**: If a key is accidentally exposed, revoke it immediately from your provider's dashboard and generate a new one.
 
 ## Troubleshooting
 
-### API Key Issues
-```
-[ERROR] OPENAI_API_KEY environment variable not set
-```
-**Solution**: Add `OPENAI_API_KEY` to `.env` file
+| Error Message                                     | Cause & Solution                                                                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `[ERROR] OPENAI_API_KEY environment variable not set` | Your key is missing. Ensure `OPENAI_API_KEY` is correctly set in your `.env` file.                                  |
+| `[ERROR] No speech detected. Please try again.`     | The microphone did not pick up clear audio. Speak louder, move closer to the mic, or check your system audio settings. |
+| `[ERROR] credentials must be of type...`            | Google Cloud authentication failed. Verify `GOOGLE_APPLICATION_CREDENTIALS` points to the correct JSON key file path. |
+| `[ERROR] Route extraction failed...`                | The OpenAI API call failed. This is often due to an invalid API key or exceeding your usage/billing limits.         |
 
-### Empty JSON Response
-```
-[ERROR] Route extraction failed: Expecting value: line 1 column 1
-```
-**Solution**: 
-- Check API quota at https://platform.openai.com/account/billing/overview
-- Verify API key is valid
-- Test with: `python test_api.py`
-
-### No Speech Detected
-```
-[ERROR] No speech detected. Please try again.
-```
-**Solution**:
-- Speak clearly and directly into microphone
-- Increase microphone volume
-- Reduce background noise
-
-### Google Cloud Authentication Error
-```
-[ERROR] credentials must be of type google.auth.credentials.Credentials
-```
-**Solution**:
-- Verify `GOOGLE_CLOUD_CREDENTIALS` is set correctly
-- Check service account JSON format
-- Use absolute file path if using file-based credentials
-
-## Testing
-
-### Test API Connection
+A simple API connection test script is included for diagnostics:
 ```bash
 python test_api.py
 ```
 
-This script tests:
-- OpenAI API connectivity
-- Available models
-- Quota status
-- Fallback mechanisms
-
-## Performance Metrics
-
-- **Recording Time**: 30-60 seconds typical (auto-stops)
-- **Preprocessing Time**: 2-5 seconds
-- **STT Processing**: 5-15 seconds (depends on audio length)
-- **OpenAI Parsing**: 2-5 seconds
-- **Total Time**: 10-35 seconds per route
-
-## Supported Routes
-
-- **Interstate Highways**: I-90, I-80, I-70, etc.
-- **US Routes**: US-75, US-59, US-18, US-69, etc.
-- **State Highways**: IA-9, IA-4, IA-3, B62, etc.
-- **US States**: All 50 states supported
-- **City/Intersection Format**: Natural language parsing
-
-## Example Route Instruction
-
-**Input (Spoken):**
-> "Authorized Route: START ON IA-9 EB AT A10 INTERSECTION LYON STATE BORDER OF SOUTH DAKOTA, US-75 SB, IA-9 EB IN ROCK RAPIDS AT N UNION ST, US-59 SB, US-18 EB IN SANBORN AT EASTERN ST, IA-4 SB IN EMMETSBURG AT BROADWAY, IA-3 EB, US-69 NB, B62 WB HANCOCK, END ON B62 AT QUAIL AVE INTERSECTION HANCOCK"
-
-**Output (Parsed):**
-```json
-{
-  "start_point": "START ON IA-9 EB AT A10 INTERSECTION (LYON) (STATE BORDER OF SOUTH DAKOTA)",
-  "end_point": "END ON B62 WB AT QUAIL AVE INTERSECTION (HANCOCK) (IOWA)",
-  "route_segments": [
-    "US-75 SB",
-    "IA-9 EB",
-    "US-59 SB",
-    "US-18 EB",
-    "IA-4 SB",
-    "IA-3 EB",
-    "US-69 NB",
-    "B62 WB"
-  ],
-  "corrected_text": "Authorized Route: START ON IA-9 EB AT A10 INTERSECTION (LYON)(STATE BORDER OF SOUTH DAKOTA), US-75 SB, IA-9 EB(IN ROCK RAPIDS AT N UNION ST), US-59 SB, US-18 EB(IN SANBORN AT EASTERN ST), IA-4 SB(IN EMMETSBURG AT BROADWAY), IA-3 EB, US-69 NB, [B62 WB (HANCOCK), END ON B62 AT QUAIL AVE INTERSECTION (HANCOCK)]"
-}
-```
-
-## Dependencies
-
-- **sounddevice** - Microphone audio input
-- **numpy** - Audio signal processing
-- **google-cloud-speech** - Google Cloud STT API
-- **openai** - OpenAI API client
-- **noisereduce** - Audio noise reduction
-- **scipy** - Signal filtering (high-pass, low-pass)
-- **google-auth** - Authentication
-
-See `requirements.txt` for versions.
-
 ## License
 
-This project is proprietary software. Unauthorized copying or distribution is prohibited.
+This project is proprietary and is protected by copyright law. Unauthorized reproduction, distribution, or modification of this software is strictly prohibited.
 
-## Support
-
-For issues or questions:
-1. Check the Troubleshooting section
-2. Review the error messages in detail
-3. Check API quotas and limits
-4. Contact: [your email/contact info]
-
-## Changelog
-
-### v1.0.0 (2025-12-12)
-- Initial release
-- Google Cloud STT integration
-- OpenAI route parsing
-- Audio preprocessing with noise reduction
-- Environment variable security
+---
+*Changelog: v1.0.0 (2025-12-12) - Initial stable release.*
