@@ -23,7 +23,7 @@ The final output is a clean JSON object, ready for integration with mapping APIs
 
 Here is the UX Design of some of the pages:
 
-<img width="100" height="225" alt="image" src="https://github.com/user-attachments/assets/892f81a1-48c8-4b84-82ba-17b2b8e730ca" /> <img width="100" height="225" alt="image" src="https://github.com/user-attachments/assets/96c60e5f-bc24-43f6-8724-2649a39d5144" /> <img width="100" height="225" alt="image" src="https://github.com/user-attachments/assets/f16d36b7-2115-4495-a3c5-f2812e747bdb" />
+<img width="200" height="450" alt="image" src="https://github.com/user-attachments/assets/892f81a1-48c8-4b84-82ba-17b2b8e730ca" /> <img width="200" height="450" alt="image" src="https://github.com/user-attachments/assets/96c60e5f-bc24-43f6-8724-2649a39d5144" /> <img width="200" height="450" alt="image" src="https://github.com/user-attachments/assets/f16d36b7-2115-4495-a3c5-f2812e747bdb" />
 
 
 
