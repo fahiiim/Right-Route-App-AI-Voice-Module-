@@ -18,14 +18,14 @@ except ImportError:
 class SpeechToTextModule:
     """Handles microphone input and Google Cloud STT processing"""
     
-    def __init__(self, max_duration_seconds=180, silence_threshold=10, chunk_size=1024):
+    def __init__(self, max_duration_seconds=180, silence_threshold=3.5, chunk_size=4096):
         """
         Initialize STT module
         
         Args:
             max_duration_seconds: Maximum recording duration (default 3 minutes)
-            silence_threshold: Stop recording after N seconds of silence (default 10)
-            chunk_size: Audio buffer size
+            silence_threshold: Stop recording after N seconds of silence (default 3.5 - allows natural speech pauses)
+            chunk_size: Audio buffer size (larger buffer for better noise detection)
         """
         self.max_duration_seconds = max_duration_seconds
         self.silence_threshold = silence_threshold
@@ -39,50 +39,57 @@ class SpeechToTextModule:
             yield audio_data[i:i + chunk_size]
     
     def preprocess_audio(self, audio_array):
-        """Preprocess audio to improve STT accuracy - remove background noise"""
+        """Minimal preprocessing to preserve speech quality while removing obvious noise"""
         try:
-            # Convert to float32 for processing
+            # Ensure we have enough data
+            if len(audio_array) < 1024:
+                print(f"[INFO] Audio short, returning as-is\n")
+                return audio_array.tobytes()
+            
+            # Convert to float32
             audio_float = audio_array.astype(np.float32) / 32768.0
             
-            # Aggressive noise reduction
+            # LIGHT noise reduction only if available
             if nr is not None:
-                # Use stationary mode for constant background noise
-                reduced_noise = nr.reduce_noise(
-                    y=audio_float, 
-                    sr=self.sample_rate,
-                    stationary=True,
-                    prop_decrease=0.95  # Aggressive noise reduction
-                )
+                try:
+                    reduced_noise = nr.reduce_noise(
+                        y=audio_float, 
+                        sr=self.sample_rate,
+                        stationary=True,
+                        prop_decrease=0.5  # Very light - preserve speech
+                    )
+                except:
+                    reduced_noise = audio_float
             else:
                 reduced_noise = audio_float
             
-            # Apply simple high-pass filter to remove rumble
+            # Gentle high-pass filter ONLY (remove true rumble)
             from scipy import signal
-            # 300 Hz high-pass filter (removes low-frequency noise)
-            sos = signal.butter(4, 300, 'hp', fs=self.sample_rate, output='sos')
-            filtered = signal.sosfilt(sos, reduced_noise)
+            try:
+                sos = signal.butter(2, 100, 'hp', fs=self.sample_rate, output='sos')
+                filtered = signal.sosfilt(sos, reduced_noise)
+            except:
+                filtered = reduced_noise
             
-            # Apply gentle low-pass to remove high-frequency hiss (around 7kHz)
-            sos_lp = signal.butter(4, 7000, 'lp', fs=self.sample_rate, output='sos')
-            filtered = signal.sosfilt(sos_lp, filtered)
-            
-            # Normalize audio
+            # Soft normalization
             max_val = np.max(np.abs(filtered))
             if max_val > 0:
-                filtered = filtered / max_val
+                filtered = filtered / max_val * 0.98
+            else:
+                filtered = reduced_noise
             
             # Convert back to int16
             audio_processed = (filtered * 32767).astype(np.int16)
             return audio_processed.tobytes()
             
         except Exception as e:
-            print(f"[WARNING] Audio preprocessing simplified: {str(e)}\n")
+            print(f"[INFO] Using original audio: {str(e)}\n")
             return audio_array.tobytes()
     
     def record_audio(self):
         """
         Record audio from microphone with intelligent speech detection
-        Only captures clear speech, ignores background noise
+        Uses adaptive silence detection to capture complete route instructions
         
         Returns:
             bytes: Raw audio data in LINEAR16 format
@@ -90,10 +97,15 @@ class SpeechToTextModule:
         print(f"[RECORDING] Max {self.max_duration_seconds}s, auto-stop after {self.silence_threshold}s silence\n")
         
         frames = []
-        silence_counter = 0
+        silence_duration = 0
+        has_detected_speech = False
         max_frames = int(self.sample_rate / self.chunk_size * self.max_duration_seconds)
         silence_frames_limit = int(self.sample_rate / self.chunk_size * self.silence_threshold)
-        speech_threshold = 500  # Higher threshold - only capture clear speech (was 100)
+        
+        # Adaptive threshold: requires 1500 RMS to detect real speech (sensitive to human voice)
+        speech_threshold = 1500
+        # Continuous speech indicator: track recent activity
+        recent_speech_frames = 0
         
         print("Speak clearly... Background noise will be ignored.\n")
         
@@ -111,17 +123,24 @@ class SpeechToTextModule:
                     data, _ = stream.read(self.chunk_size)
                     frames.append(data.copy())
                     
-                    # Calculate RMS for sound level detection
+                    # Calculate RMS energy for accurate speech detection
                     rms = np.sqrt(np.mean(data.astype(np.float32) ** 2))
                     
-                    # Intelligent speech detection - only clear speech (high RMS)
-                    if rms < speech_threshold:
-                        silence_counter += 1
+                    # Multi-stage detection:
+                    if rms >= speech_threshold:
+                        silence_duration = 0
+                        has_detected_speech = True
+                        recent_speech_frames = 5  # Keep buffer of recent speech
                     else:
-                        silence_counter = 0  # Reset on speech detection
+                        # Decrement recent speech tracker
+                        if recent_speech_frames > 0:
+                            recent_speech_frames -= 1
+                        # Only count silence if no recent speech activity
+                        if has_detected_speech and recent_speech_frames == 0:
+                            silence_duration += 1
                     
-                    # Stop if silence threshold reached
-                    if silence_counter >= silence_frames_limit:
+                    # Stop only after sustained silence at the END of speaking
+                    if has_detected_speech and silence_duration >= silence_frames_limit and recent_speech_frames == 0:
                         print("\n[SILENCE DETECTED] Recording stopped\n")
                         break
                     
@@ -131,8 +150,10 @@ class SpeechToTextModule:
         
         if frames:
             audio_array = np.concatenate(frames, axis=0)
-            # Aggressive preprocessing to remove all noise
+            print(f"[DEBUG] Total audio captured: {len(audio_array)} samples ({len(audio_array)/self.sample_rate:.2f} seconds)\n")
+            # Minimal preprocessing - preserve audio quality
             audio_bytes = self.preprocess_audio(audio_array)
+            print(f"[DEBUG] Audio after preprocessing: {len(audio_bytes)} bytes\n")
         else:
             audio_bytes = b''
         
@@ -154,26 +175,52 @@ class SpeechToTextModule:
             print("[ERROR] No audio data to process\n")
             return None
         
+        print(f"[DEBUG] Audio size: {len(audio_data)} bytes\n")
         print("[PROCESSING] Google Cloud STT...\n")
         
         try:
-            # First try: Standard recognition (better for complex content)
+            # Use latest_long model - best for structured and command-heavy content
             config = speech_v1.RecognitionConfig(
                 encoding=STT_CONFIG['encoding'],
                 sample_rate_hertz=self.sample_rate,
                 language_code=STT_CONFIG['language_code'],
                 enable_automatic_punctuation=True,
                 use_enhanced=True,
-                model='video',  # Better for long-form audio
+                model='latest_long',  # Best model for route data and navigation
                 speech_contexts=[
-                    speech_v1.SpeechContext(phrases=[
-                        'INTERSECTION', 'STATE BORDER', 'NORTHBOUND', 'SOUTHBOUND',
-                        'EASTBOUND', 'WESTBOUND', 'START ON', 'END ON', 'AT',
-                        'IN', 'SB', 'EB', 'NB', 'WB', 'A10', 'B62', 'QUAIL AVE',
-                        'LYON', 'ROCK RAPIDS', 'SANBORN', 'EMMETSBURG', 'HANCOCK',
-                        'UNION STREET', 'EASTERN STREET', 'BROADWAY'
-                    ])
-                ]
+                    speech_v1.SpeechContext(
+                        phrases=[
+                            # Route numbers - most critical
+                            'I-29', 'I-35', 'I-90', 'I-80', 'I-70', 'I-480',
+                            'US-75', 'US-59', 'US-18', 'US-69', 'US-20', 'US-30',
+                            'IA-9', 'IA-4', 'IA-3', 'IA-27', 'IA-175',
+                            'B-62', 'B62', 'A-10', 'A10',
+                            # Directional suffixes
+                            'NORTHBOUND', 'SOUTHBOUND', 'EASTBOUND', 'WESTBOUND',
+                            'NB', 'SB', 'EB', 'WB', 'NORTH', 'SOUTH', 'EAST', 'WEST',
+                            # Intersection markers
+                            'INTERSECTION', 'AT INTERSECTION', 'MILEPOST', 'MP',
+                            'STATE BORDER', 'JUNCTION', 'EXIT', 'MILE MARKER',
+                            # Action commands
+                            'START ON', 'START AT', 'END ON', 'END AT', 'END UP',
+                            'CONTINUE', 'TURN', 'MERGE', 'TAKE',
+                            'AT', 'IN', 'NEAR', 'TOWARDS',
+                            # City and location names
+                            'LYON', 'ROCK RAPIDS', 'SANBORN', 'EMMETSBURG', 
+                            'HANCOCK', 'SIOUX CITY', 'SPENCER', 'ESTHERVILLE',
+                            'CHEROKEE', 'STORM LAKE', 'TOLEDO', 'MAPLETON',
+                            'WASHTA', 'DUNLAP', 'DENISON', 'CRAWFORD',
+                            # Street names
+                            'UNION', 'BROADWAY', 'EASTERN', 'QUAIL',
+                            'MAIN STREET', 'FIRST STREET', 'SECOND STREET',
+                            # State abbreviations
+                            'IOWA', 'SOUTH DAKOTA', 'MINNESOTA', 'WISCONSIN',
+                            'IA', 'SD', 'MN', 'WI',
+                        ],
+                        boost=15.0  # Strong boost for accurate route matching
+                    )
+                ],
+                profanity_filter=False,  # Don't filter route-related terms
             )
             
             audio = speech_v1.RecognitionAudio(content=audio_data)
@@ -181,7 +228,10 @@ class SpeechToTextModule:
             
             if response.results and response.results[0].alternatives:
                 transcript = response.results[0].alternatives[0].transcript
-                print("[INFO] Used standard recognition (better for complex content)\n")
+                confidence = response.results[0].alternatives[0].confidence
+                print(f"[INFO] Transcription confidence: {confidence:.2%}\n")
+                if confidence < 0.5:
+                    print(f"[WARNING] Low confidence ({confidence:.2%}) - result may be inaccurate\n")
                 return transcript
                 
         except Exception as e:
@@ -197,16 +247,41 @@ class SpeechToTextModule:
                 language_code=STT_CONFIG['language_code'],
                 enable_automatic_punctuation=True,
                 use_enhanced=True,
-                model='video',
+                model='latest_long',
                 speech_contexts=[
-                    speech_v1.SpeechContext(phrases=[
-                        'INTERSECTION', 'STATE BORDER', 'NORTHBOUND', 'SOUTHBOUND',
-                        'EASTBOUND', 'WESTBOUND', 'START ON', 'END ON', 'AT',
-                        'IN', 'SB', 'EB', 'NB', 'WB', 'A10', 'B62', 'QUAIL AVE',
-                        'LYON', 'ROCK RAPIDS', 'SANBORN', 'EMMETSBURG', 'HANCOCK',
-                        'UNION STREET', 'EASTERN STREET', 'BROADWAY'
-                    ])
-                ]
+                    speech_v1.SpeechContext(
+                        phrases=[
+                            # Route numbers - most critical
+                            'I-29', 'I-35', 'I-90', 'I-80', 'I-70', 'I-480',
+                            'US-75', 'US-59', 'US-18', 'US-69', 'US-20', 'US-30',
+                            'IA-9', 'IA-4', 'IA-3', 'IA-27', 'IA-175',
+                            'B-62', 'B62', 'A-10', 'A10',
+                            # Directional suffixes
+                            'NORTHBOUND', 'SOUTHBOUND', 'EASTBOUND', 'WESTBOUND',
+                            'NB', 'SB', 'EB', 'WB', 'NORTH', 'SOUTH', 'EAST', 'WEST',
+                            # Intersection markers
+                            'INTERSECTION', 'AT INTERSECTION', 'MILEPOST', 'MP',
+                            'STATE BORDER', 'JUNCTION', 'EXIT', 'MILE MARKER',
+                            # Action commands
+                            'START ON', 'START AT', 'END ON', 'END AT', 'END UP',
+                            'CONTINUE', 'TURN', 'MERGE', 'TAKE',
+                            'AT', 'IN', 'NEAR', 'TOWARDS',
+                            # City and location names
+                            'LYON', 'ROCK RAPIDS', 'SANBORN', 'EMMETSBURG', 
+                            'HANCOCK', 'SIOUX CITY', 'SPENCER', 'ESTHERVILLE',
+                            'CHEROKEE', 'STORM LAKE', 'TOLEDO', 'MAPLETON',
+                            'WASHTA', 'DUNLAP', 'DENISON', 'CRAWFORD',
+                            # Street names
+                            'UNION', 'BROADWAY', 'EASTERN', 'QUAIL',
+                            'MAIN STREET', 'FIRST STREET', 'SECOND STREET',
+                            # State abbreviations
+                            'IOWA', 'SOUTH DAKOTA', 'MINNESOTA', 'WISCONSIN',
+                            'IA', 'SD', 'MN', 'WI',
+                        ],
+                        boost=15.0
+                    )
+                ],
+                profanity_filter=False,
             )
             
             streaming_config = speech_v1.StreamingRecognitionConfig(config=config)

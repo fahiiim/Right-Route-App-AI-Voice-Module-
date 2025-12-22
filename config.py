@@ -5,8 +5,12 @@ Secure credentials and settings for Google Cloud Speech-to-Text API
 
 import os
 import json
+from dotenv import load_dotenv
 from google.cloud import speech_v1
 from google.oauth2 import service_account
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Load Google Cloud credentials from environment variable or file
 def get_google_credentials():
